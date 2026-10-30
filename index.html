@@ -1,0 +1,1940 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Modélisation 3D Maison</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: Arial, sans-serif;
+      background: #1a1a2e;
+      color: #eee;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #header {
+      background: #16213e;
+      padding: 10px 20px;
+      display: flex;
+      align-items: center;
+      gap: 20px;
+      border-bottom: 1px solid #0f3460;
+      flex-shrink: 0;
+    }
+
+    #header h1 {
+      font-size: 16px;
+      color: #e94560;
+    }
+
+    .badge {
+      background: #0f3460;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 12px;
+      color: #a8b2d8;
+    }
+
+    #main {
+      display: flex;
+      flex: 1;
+      overflow: hidden;
+    }
+
+    #canvas-container {
+      flex: 1;
+      position: relative;
+    }
+
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+    }
+
+    #sidebar {
+      width: 280px;
+      background: #16213e;
+      border-left: 1px solid #0f3460;
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+
+    .panel {
+      border-bottom: 1px solid #0f3460;
+      padding: 14px;
+    }
+
+    .ext-btn {
+      display: block;
+      width: 100%;
+      padding: 8px;
+      margin-bottom: 6px;
+      background: #0f3460;
+      color: #eee;
+      border: 1px solid #1a4a7a;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 12px;
+      text-align: left;
+      transition: all 0.2s;
+    }
+
+    .ext-btn:hover {
+      background: #1a4a7a;
+      border-color: #e94560;
+    }
+
+    .ext-btn.active {
+      background: #e94560;
+      border-color: #e94560;
+      color: #fff;
+    }
+
+    .dim-label {
+      background: rgba(0,0,0,0.6);
+      color: #fff;
+      font-size: 11px;
+      font-family: monospace;
+      padding: 2px 7px;
+      border-radius: 3px;
+      white-space: nowrap;
+      pointer-events: none;
+      border: 1px solid rgba(255,255,255,0.2);
+    }
+
+    .dim-label.surface {
+      font-size: 13px;
+      font-weight: bold;
+      background: rgba(233, 69, 96, 0.92);
+      border-color: #fff;
+    }
+
+    #tabs {
+      margin-left: auto;
+      display: flex;
+      gap: 6px;
+    }
+
+    .tab {
+      padding: 6px 12px;
+      background: #0f3460;
+      color: #a8b2d8;
+      border: 1px solid #1a4a7a;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
+    .tab:hover { border-color: #e94560; }
+
+    .tab.active {
+      background: #e94560;
+      border-color: #e94560;
+      color: #fff;
+    }
+
+    #plan-view {
+      position: absolute;
+      inset: 0;
+      display: none;
+      background: #e9e7df;
+      overflow: auto;
+      z-index: 10;
+    }
+
+    #plan-view.active { display: flex; }
+
+    #plan-panel {
+      margin: auto;
+      padding: 22px 30px;
+      width: min(1100px, 100%);
+      box-sizing: border-box;
+    }
+
+    #plan-head h2 {
+      font-size: 18px;
+      color: #1a1a2e;
+      margin-bottom: 4px;
+    }
+
+    #plan-head p {
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 12px;
+    }
+
+    #plan-svg-wrap svg {
+      width: auto;
+      height: min(72vh, 700px);
+      max-width: 100%;
+      display: block;
+      margin: 0 auto;
+      background: #fbfaf6;
+      border: 1px solid #c9c6bc;
+      border-radius: 8px;
+    }
+
+    #menu-toggle { display: none; }
+
+    @media (max-width: 768px) {
+      #menu-toggle {
+        display: block;
+        position: fixed;
+        top: 10px;
+        right: 10px;
+        z-index: 30;
+        width: 42px;
+        height: 42px;
+        border-radius: 8px;
+        border: 1px solid #1a4a7a;
+        background: #0f3460;
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+      }
+
+      #sidebar {
+        position: fixed;
+        top: 0;
+        right: 0;
+        height: 100%;
+        width: min(82vw, 320px);
+        transform: translateX(100%);
+        transition: transform 0.25s ease;
+        z-index: 20;
+        box-shadow: -4px 0 16px rgba(0, 0, 0, 0.5);
+      }
+
+      #sidebar.open { transform: translateX(0); }
+
+      #canvas-container { width: 100%; }
+
+      #plan-panel { padding: 14px 12px; }
+
+      #plan-svg-wrap svg { width: 100%; height: auto; }
+    }
+
+    #status-bar {
+      background: #0f3460;
+      padding: 4px 20px;
+      font-size: 11px;
+      color: #a8b2d8;
+      flex-shrink: 0;
+    }
+  </style>
+</head>
+
+<body>
+
+  <button id="menu-toggle" onclick="toggleMenu()" aria-label="Menu">☰</button>
+
+  <div id="main">
+    <div id="canvas-container">
+      <canvas id="c"></canvas>
+      <div id="plan-view">
+        <div id="plan-panel">
+          <div id="plan-head">
+            <h2>Extension en L — vue de dessus (cotes extérieures)</h2>
+            <p>Cotes extérieures en mètres · hauteur 2,60 m</p>
+          </div>
+          <div id="plan-svg-wrap"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="sidebar">
+
+      <div class="panel">
+        <button id="btn-plan" onclick="togglePlan()" class="ext-btn">Afficher le plan</button>
+        <button id="btn-ext-projet" onclick="toggleExtension('projet')" class="ext-btn active">
+          Masquer l'extension
+        </button>
+        <button id="btn-terrasse" onclick="toggleTerrasse()" class="ext-btn active">
+          Cacher la terrasse
+        </button>
+        <button id="btn-dims" onclick="toggleDims()" class="ext-btn">
+          Afficher les dimensions
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="status-bar" id="status">Cliquez et faites glisser pour tourner autour de la maison.</div>
+
+  <script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.158.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.158.0/examples/jsm/"
+  }
+}
+</script>
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js';
+
+    // ─── SCENE SETUP ────────────────────────────────────────────────────────────
+    const canvas = document.getElementById('c');
+    const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.shadowMap.enabled = false;
+    renderer.setClearColor(0x1a1a2e);
+
+    const scene = new THREE.Scene();
+    scene.fog = new THREE.Fog(0x1a1a2e, 60, 120);
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 200);
+    camera.position.set(20, 15, 20);
+
+    const labelRenderer = new CSS2DRenderer();
+    labelRenderer.setSize(window.innerWidth, window.innerHeight);
+    labelRenderer.domElement.style.cssText = 'position:absolute;top:0;left:0;pointer-events:none;';
+    document.body.appendChild(labelRenderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.08;
+    controls.minDistance = 5;
+    controls.maxDistance = 80;
+    controls.maxPolarAngle = Math.PI / 2;
+
+    // ─── LIGHTS ─────────────────────────────────────────────────────────────────
+    const ambient = new THREE.AmbientLight(0xffffff, 0.5);
+    scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xfff5e0, 1.2);
+    sun.position.set(20, 30, 20);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 100;
+    sun.shadow.camera.left = -30;
+    sun.shadow.camera.right = 30;
+    sun.shadow.camera.top = 30;
+    sun.shadow.camera.bottom = -30;
+    scene.add(sun);
+
+    const fill = new THREE.DirectionalLight(0xa0c0ff, 0.3);
+    fill.position.set(-10, 10, -10);
+    scene.add(fill);
+
+    // ─── MATERIALS ──────────────────────────────────────────────────────────────
+    const matMain = new THREE.MeshLambertMaterial({ color: 0x8a9e7a });
+    const matAile = new THREE.MeshLambertMaterial({ color: 0x7a9068 });
+    const matSousSol = new THREE.MeshLambertMaterial({ color: 0xf0f0f0 });
+    const matToit = new THREE.MeshLambertMaterial({ color: 0x8b3a2a, side: THREE.DoubleSide });
+    const matSol = new THREE.MeshLambertMaterial({ color: 0x2a4a2a });
+    // Matériaux partagés entre les blocs extensions
+    const matEsc = new THREE.MeshLambertMaterial({ color: 0xf0f0f0 }); // escaliers
+    const matGC  = new THREE.MeshLambertMaterial({ color: 0x111111 }); // garde-corps
+    const matGP  = new THREE.MeshLambertMaterial({ color: 0xcccccc }); // toit plat terrasse
+    const matDal = new THREE.MeshLambertMaterial({ color: 0xb8b8a0 }); // dalle terrasse
+    const matPil = new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }); // poteaux terrasse
+
+    // ─── DIMENSIONS ──────────────────────────────────────────────────────────────
+    const D = {
+      // Corps principal (centré en 0,0)
+      mainW: 6.69, mainD: 7.1,  // largeur X (Est-Ouest), profondeur Z (Nord-Sud)
+      mainH_ss: 1.9,             // sous-sol
+      mainH_rdc: 2.7,            // RDC
+      mainH_et1: 2.7,            // 1er étage
+      // Aile (arrière-droite) — RDC uniquement
+      aileW: 3.9, aileD: 2.5,   // 3,9m en X (largeur cuisine), 2,5m en Z (profondeur)
+      aileH: 2.4,                // RDC uniquement (hauteur sous plafond 2.4m)
+      // Toit
+      toitPente: Math.tan(30 * Math.PI / 180),
+    };
+
+    // Hauteurs cumulées — sous-sol visible hors sol (2m)
+    const ss_y = 0;                                    // base sous-sol = sol
+    const rdc_y = 2.0;                                  // base RDC au-dessus du soubassement
+    const et1_y = rdc_y + D.mainH_rdc;                 // base 1er étage
+    const toit_y = et1_y + D.mainH_et1;                 // base toit
+
+    // Corps principal centré sur X=0, Z=0 (milieu du corps)
+    // L'aile part à l'arrière-gauche : X négatif, Z positif
+    const mainX = -D.mainW / 2;  // coin gauche corps principal en X
+    const mainZ = -D.mainD / 2;  // coin avant corps principal en Z
+
+    // ─── HELPERS ─────────────────────────────────────────────────────────────────
+    const matMoulure = new THREE.MeshLambertMaterial({ color: 0xe0e0e0 });
+
+    function addCornerMoulding(x, z, h, yBase, cornerType, targetGroup) {
+      const grp = targetGroup || scene;
+      const ep = 0.30;
+      const epais = 0.02;
+
+      if (cornerType === 'NW') {
+        grp.add(box(ep, h, epais, matMoulure, x, yBase, z - epais));
+        grp.add(box(epais, h, ep, matMoulure, x - epais, yBase, z));
+      } else if (cornerType === 'NE') {
+        grp.add(box(ep, h, epais, matMoulure, x - ep, yBase, z - epais));
+        grp.add(box(epais, h, ep, matMoulure, x, yBase, z));
+      } else if (cornerType === 'SW') {
+        grp.add(box(ep, h, epais, matMoulure, x, yBase, z));
+        grp.add(box(epais, h, ep, matMoulure, x - epais, yBase, z - ep));
+      } else if (cornerType === 'SE') {
+        grp.add(box(ep, h, epais, matMoulure, x - ep, yBase, z));
+        grp.add(box(epais, h, ep, matMoulure, x, yBase, z - ep));
+      }
+    }
+
+    function box(w, h, d, mat, x, y, z) {
+      const geo = new THREE.BoxGeometry(w, h, d);
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x + w / 2, y + h / 2, z + d / 2);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      return mesh;
+    }
+
+
+    // ─── TERRAIN ─────────────────────────────────────────────────────────────────
+    const groundGeo = new THREE.PlaneGeometry(60, 60);
+    const groundMat = new THREE.MeshLambertMaterial({ color: 0x1e3a1e });
+    const ground = new THREE.Mesh(groundGeo, groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.position.y = 0;
+    scene.add(ground);
+
+    // ─── DALLE BÉTON autour de la maison ─────────────────────────────────────────
+    {
+      const matBeton = new THREE.MeshLambertMaterial({ color: 0x8a8a8a });
+      const margeNord = 5;
+      const marge = 2;
+      const bXmin = mainX - marge;
+      const bXmax = mainX + D.mainW + marge;
+      const bZmin = mainZ - margeNord;
+      const bZmax = mainZ + D.mainD + D.aileD + marge + 1;
+      const bW = bXmax - bXmin;
+      const bD = bZmax - bZmin;
+      // BoxGeometry de 10cm d'épaisseur → face supérieure à y=0.10, plus de z-fighting avec le quadrillage
+      const dalle = new THREE.Mesh(new THREE.BoxGeometry(bW, 0.10, bD), matBeton);
+      dalle.position.set(bXmin + bW / 2, 0.05, bZmin + bD / 2);
+      scene.add(dalle);
+    }
+
+    // ─── QUADRILLAGE (herbe verte) ───────────────────────────────────────────────
+    const grid = new THREE.GridHelper(80, 80, 0x2a5a2a, 0x2a5a2a);
+    grid.position.y = 0;
+    scene.add(grid);
+
+    // ─── FENÊTRES (placées en façade, légèrement en saillie) ─────────────────────
+    const matFenetre = new THREE.MeshLambertMaterial({ color: 0xd8e8f0, transparent: true, opacity: 0.7 });
+    const matCadre = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    const matCadre2 = new THREE.MeshLambertMaterial({ color: 0xe8e8e8 }); // cadre intérieur légèrement grisé
+    const eps = 0.07; // épaisseur cadre extérieur
+    const eps2 = 0.04; // épaisseur cadre intérieur
+
+    function fenetre(w, h, allege, xCenter, wallZ, zFront, targetGroup) {
+      const grp = targetGroup || scene;
+      const yC = rdc_y + allege + h / 2;
+      // Vitrage
+      const vit = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.04), matFenetre);
+      vit.position.set(xCenter, yC, wallZ);
+      vit.castShadow = false;
+      grp.add(vit);
+
+      // Cadre extérieur (blanc pur)
+      [
+        [w + eps * 2, eps, 0.07, 0, h / 2 + eps / 2],   // haut
+        [w + eps * 2, eps, 0.07, 0, -h / 2 - eps / 2],   // bas
+        [eps, h, 0.07, -w / 2 - eps / 2, 0],              // gauche
+        [eps, h, 0.07, w / 2 + eps / 2, 0],              // droite
+      ].forEach(([cw, ch, cd, dx, dy]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+        c.position.set(xCenter + dx, yC + dy, wallZ);
+        c.castShadow = false;
+        grp.add(c);
+      });
+
+      // Cadre intérieur (blanc légèrement grisé, posé devant le vitrage)
+      const w2 = w - eps2, h2 = h - eps2;
+      const innerFrames = [
+        [w2 + eps2 * 2, eps2, 0.06, 0, h2 / 2 + eps2 / 2],  // haut
+        [w2 + eps2 * 2, eps2, 0.06, 0, -h2 / 2 - eps2 / 2],  // bas
+        [eps2, h2, 0.06, -w2 / 2 - eps2 / 2, 0],               // gauche
+        [eps2, h2, 0.06, w2 / 2 + eps2 / 2, 0]                // droite
+      ];
+
+      // Montants centraux en fonction de la largeur (w)
+      if (w >= 1.5) {
+        // 3 battants -> 2 montants verticaux (répartis à 1/3 et 2/3 de la largeur)
+        innerFrames.push([eps2, h2, 0.06, -w / 6, 0]);
+        innerFrames.push([eps2, h2, 0.06, w / 6, 0]);
+      } else if (w >= 1) {
+        // 2 battants -> 1 montant central
+        innerFrames.push([eps2, h2, 0.06, 0, 0]);
+      }
+
+      innerFrames.forEach(([cw, ch, cd, dx, dy]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre2);
+        c.position.set(xCenter + dx, yC + dy, wallZ + 0.015);
+        c.castShadow = false;
+        grp.add(c);
+      });
+    }
+
+    // ─── FAÇADE OUEST — fenêtres ──────────────────────────────────────────────────
+    // fenetre() place le vitrage sur un mur parallèle à X (position wallZ).
+    // Pour le mur Ouest on crée un groupe tourné de 90° autour de Y.
+    function fenetreOuest(w, h, allege, zCenter, wallX) {
+      const g = new THREE.Group();
+      // On appelle fenetre en passant xCenter=0, wallZ=0 (coordonnées locales)
+      // puis on repositionne/tourne le groupe
+      const yC = rdc_y + allege + h / 2;
+      // Vitrage
+      const vit = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.04), matFenetre);
+      vit.position.set(0, 0, 0);
+      vit.castShadow = false;
+      g.add(vit);
+      // Cadre extérieur
+      [
+        [w + eps * 2, eps, 0.07, 0, h / 2 + eps / 2],
+        [w + eps * 2, eps, 0.07, 0, -h / 2 - eps / 2],
+        [eps, h, 0.07, -w / 2 - eps / 2, 0],
+        [eps, h, 0.07, w / 2 + eps / 2, 0],
+      ].forEach(([cw, ch, cd, dx, dy]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+        c.position.set(dx, dy, 0);
+        c.castShadow = false;
+        g.add(c);
+      });
+      // Cadre intérieur
+      const w2 = w - eps2, h2 = h - eps2;
+      const innerFrames = [
+        [w2 + eps2 * 2, eps2, 0.06, 0, h2 / 2 + eps2 / 2],
+        [w2 + eps2 * 2, eps2, 0.06, 0, -h2 / 2 - eps2 / 2],
+        [eps2, h2, 0.06, -w2 / 2 - eps2 / 2, 0],
+        [eps2, h2, 0.06, w2 / 2 + eps2 / 2, 0]
+      ];
+      if (w >= 1.5) {
+        innerFrames.push([eps2, h2, 0.06, -w / 6, 0], [eps2, h2, 0.06, w / 6, 0]);
+      } else if (w >= 1) {
+        innerFrames.push([eps2, h2, 0.06, 0, 0]);
+      }
+      innerFrames.forEach(([cw, ch, cd, dx, dy]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre2);
+        c.position.set(dx, dy, 0.015);
+        c.castShadow = false;
+        g.add(c);
+      });
+      // Rotation 90° autour de Y pour plaquer sur le mur Ouest
+      g.rotation.y = Math.PI / 2;
+      g.position.set(wallX, yC, zCenter);
+      scene.add(g);
+    }
+
+    // ─── FAÇADE EST — fenêtres ────────────────────────────────────────────────────
+    // Mur Est : x = mainX + mainW = 3.5
+    // Grande 1×2m      : bas à 2.7m du sol → yC = 2.7 + 1.0 = 3.7  (1er étage)
+    //                    position Z à déterminer (centré sur la largeur disponible)
+    // Petite 0.6×0.9m  : 0.5m du mur Nord → zC = mainZ + 0.5 + 0.3 = mainZ + 0.8
+    //                    bas à 3.9m du sol → yC = 3.9 + 0.45 = 4.35  (1er étage)
+    // Sous-sol 0.9×2.2m: centre à 1.4m du mur Sud → zC = mainZ+mainD - 1.4 = 2.1
+    //                    bas à 0.3m du sol → yC = 0.3 + 1.1 = 1.4
+    {
+      const xEst = mainX + D.mainW + 0.02;
+
+      // Fonction générique : yCenter absolu (pas relatif à rdc_y)
+      function fenetreEstAbs(fw, fh, yCenter, zCenter) {
+        const g = new THREE.Group();
+        const vit = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, 0.04), matFenetre);
+        g.add(vit);
+        [[fw + eps * 2, eps, 0.07, 0, fh / 2 + eps / 2], [fw + eps * 2, eps, 0.07, 0, -fh / 2 - eps / 2],
+        [eps, fh, 0.07, -fw / 2 - eps / 2, 0], [eps, fh, 0.07, fw / 2 + eps / 2, 0]
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+          c.position.set(dx, dy, 0); g.add(c);
+        });
+        const w2 = fw - eps2, h2 = fh - eps2;
+        const innerFrames = [
+          [w2 + eps2 * 2, eps2, 0.06, 0, h2 / 2 + eps2 / 2],
+          [w2 + eps2 * 2, eps2, 0.06, 0, -h2 / 2 - eps2 / 2],
+          [eps2, h2, 0.06, -w2 / 2 - eps2 / 2, 0],
+          [eps2, h2, 0.06, w2 / 2 + eps2 / 2, 0]
+        ];
+        if (fw >= 1.5) {
+          innerFrames.push([eps2, h2, 0.06, -fw / 6, 0], [eps2, h2, 0.06, fw / 6, 0]);
+        } else if (fw >= 1) {
+          innerFrames.push([eps2, h2, 0.06, 0, 0]);
+        }
+        innerFrames.forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre2);
+          c.position.set(dx, dy, 0.015); g.add(c);
+        });
+        g.rotation.y = Math.PI / 2;
+        g.position.set(xEst, yCenter, zCenter);
+        scene.add(g);
+      }
+
+      // Grande fenêtre 1×2m : bas à 4.1m → yC = 4.1 + 1.0 = 5.1  (1er étage)
+      //   position Z : centre du mur (mainZ + mainD/2)
+      fenetreEstAbs(1, 2, 4.1 + 1.0, mainZ + D.mainD / 2);
+
+      // Petite fenêtre 0.6×0.9m : 0.5m du mur Nord, bas à 3.9m → yC = 3.9 + 0.45 = 4.35
+      fenetreEstAbs(0.6, 0.9, 3.9 + 0.45, mainZ + 0.5 + 0.3);
+
+      // Porte de service 0.9×2.2m : niveau du sol, à 1.4m du mur Nord → zC = mainZ + 1.4 + 0.45
+      {
+        const matPorteBeige = new THREE.MeshLambertMaterial({ color: 0xd4b896 });
+        const matPorteBeige2 = new THREE.MeshLambertMaterial({ color: 0xc8a882 });
+        const fw = 0.9, fh = 2.2;
+        const yC = ss_y + fh / 2;               // posée au niveau du sol
+        const zC = mainZ + 1.4 + fw / 2;        // 1.4m du mur Nord + demi-largeur
+
+        const g = new THREE.Group();
+        // Panneau porte (beige plein, pas transparent)
+        const vit = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, 0.04), matPorteBeige);
+        g.add(vit);
+        // Cadre extérieur blanc
+        [[fw + eps * 2, eps, 0.07, 0, fh / 2 + eps / 2], [fw + eps * 2, eps, 0.07, 0, -fh / 2 - eps / 2],
+        [eps, fh, 0.07, -fw / 2 - eps / 2, 0], [eps, fh, 0.07, fw / 2 + eps / 2, 0]
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+          c.position.set(dx, dy, 0); g.add(c);
+        });
+        // Panneau central (beige plus foncé — style porte)
+        const pan = new THREE.Mesh(new THREE.BoxGeometry(fw * 0.7, fh * 0.8, 0.05), matPorteBeige2);
+        pan.position.set(0, 0, 0.02);
+        g.add(pan);
+        // Poignée (petit cylindre noir)
+        const matPoignee = new THREE.MeshLambertMaterial({ color: 0x222222 });
+        const poignee = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.12, 8), matPoignee);
+        poignee.rotation.z = Math.PI / 2;
+        poignee.position.set(fw * 0.3, -fh * 0.05, 0.07);
+        g.add(poignee);
+
+        g.rotation.y = Math.PI / 2;
+        g.position.set(xEst, yC, zC);
+        scene.add(g);
+      }
+
+    }
+
+    // Façade arrière corps principal (mur Sud = mainZ + mainD)
+    // La façade fait 7m de large, de mainX (-3.5) à mainX+7 (3.5)
+    // Fenêtre 1 : à 1.66m du bord gauche (mainX), centre à mainX + 1.66 + 0.5 = mainX + 2.16
+    // Fenêtre 2 : fenêtre 1 + 0.5 (largeur) + 2.03 + 0.5 = centre à mainX + 2.16 + 2.03 + 1 = mainX + 5.19 -> hors mur, relire
+    // Plan : bord gauche=0, F1 centre à 1.66+0.5=2.16, F2 centre à 2.16+1+2.03=5.19... 5.19 < 7 ok
+    {
+      const zFacade = mainZ + D.mainD + 0.02;
+      // F1 haut (RDC) : 1×2m, allège 0.5 — décalée 10cm vers l'Ouest
+      fenetre(1, 2, 0.5, mainX + 1.96, zFacade, zFacade);
+      // F2 haut (RDC) derrière l'aile : supprimée car l'aile y est accolée
+      // Même disposition à l'étage
+      fenetre(1, 2, 0.5 + D.mainH_rdc, mainX + 1.96, zFacade, zFacade);
+      fenetre(1, 2, 0.5 + D.mainH_rdc, mainX + 4.99, zFacade, zFacade);
+    }
+
+    // ─── FAÇADE NORD ──────────────────────────────────────────────────────────────
+    // Largeur totale : mainW = 6.69m, mur Nord à z = mainZ = -3.55
+    // Vue depuis le Nord : gauche = Ouest (mainX = -3.35), droite = Est (mainX+mainW = 3.35)
+    // ─── FAÇADE NORD — RDC + Étage (partie maison au-dessus du soubassement) ──────
+    // Fenêtres RDC (et étage) :
+    //   F1 gauche : 1×2m, allège 0.5, centre X = mainX + 1.66 + 0.5 = mainX + 2.16
+    //   F2 droite : 1×2m, allège 0.5, centre X = mainX + 1.66 + 1 + 1.47 + 0.5 = mainX + 4.63
+    // Porte entrée vitrée : 0.8×2.5m, posée au sol rdc_y, centre X = mainX + 1.66 + 0.4
+    // Fenêtre large RDC : 1.6×2m, allège 0.5, à 1.37m du bord Est
+    //   centre X = mainX + mainW - 1.37 - 0.8 = mainX + 4.53
+    {
+      const zNord = mainZ - 0.02;  // légèrement en saillie vers le Nord
+
+      // ── Escalier Nord (sous-sol → RDC) ──
+      // Descend vers le Nord (Z-), centré sous la porte d'entrée
+      // Marches 18cm, giron 28cm, largeur 1.2m, garde-corps blanc
+      {
+        const xC = mainX + D.mainW - 1.37 - 0.4;
+        const largeurHaut = 1.35;  // largeur en haut (contre le mur)
+        const largeurBas = 1.85;  // largeur en bas (au sol)
+        const giron = 0.28;
+        const nbMarches = Math.round(rdc_y / 0.18);
+        const hauteurMarche = rdc_y / nbMarches;
+        const depasse = 0.20;
+
+        const matEsc = new THREE.MeshLambertMaterial({ color: 0xf0f0f0 });
+        const matGarde = new THREE.MeshLambertMaterial({ color: 0xffffff });
+
+        const escZstart = zNord;   // haut contre le mur
+
+        // Palier haut de 80 cm + marches basses (longueur totale conservée)
+        const palier = 0.80;
+        const nbMarchesBasses = nbMarches - 1;
+        const gironBas = (nbMarches * giron - palier) / nbMarchesBasses;
+        const zPalier = escZstart - palier;
+        const yPrismPalier = rdc_y * (1 - palier / (nbMarches * giron + depasse));
+
+        // Plateau du haut (posé sur le dessous plein)
+        scene.add(box(largeurHaut, rdc_y - yPrismPalier, palier, matEsc,
+          xC - largeurHaut / 2, yPrismPalier, zPalier));
+
+        // Marches basses : largeur interpolée entre largeurHaut et largeurBas
+        for (let j = 0; j < nbMarchesBasses; j++) {
+          const t = j / (nbMarchesBasses - 1);
+          const larg = largeurHaut + t * (largeurBas - largeurHaut);
+          const yTop = rdc_y - (j + 1) * hauteurMarche;
+          const zRight = zPalier - j * gironBas;
+          const m = box(larg, hauteurMarche, gironBas, matEsc,
+            xC - larg / 2, yTop - hauteurMarche, zRight - gironBas);
+          scene.add(m);
+        }
+
+        // Dessous plein (prisme — côtés gauche/droit légèrement évasés)
+        const longueurTotale = nbMarches * giron + depasse;
+        const z0 = escZstart;
+        const z1 = escZstart - longueurTotale;
+        const xLhaut = xC - largeurHaut / 2, xRhaut = xC + largeurHaut / 2;
+        const xLbas = xC - largeurBas / 2, xRbas = xC + largeurBas / 2;
+        const sousGeo = new THREE.BufferGeometry();
+        const sv = new Float32Array([
+          // face gauche évasée
+          xLhaut, ss_y, z0, xLhaut, rdc_y, z0, xLbas, ss_y, z1,
+          // face droite évasée
+          xRhaut, ss_y, z0, xRbas, ss_y, z1, xRhaut, rdc_y, z0,
+          // dessous horizontal
+          xLhaut, ss_y, z0, xRhaut, ss_y, z0, xLbas, ss_y, z1,
+          xLbas, ss_y, z1, xRhaut, ss_y, z0, xRbas, ss_y, z1,
+          // face inclinée (dessous des marches)
+          xLhaut, rdc_y, z0, xLbas, ss_y, z1, xRhaut, rdc_y, z0,
+          xRhaut, rdc_y, z0, xLbas, ss_y, z1, xRbas, ss_y, z1,
+          // face verticale côté mur
+          xLhaut, ss_y, z0, xLhaut, rdc_y, z0, xRhaut, ss_y, z0,
+          xRhaut, ss_y, z0, xLhaut, rdc_y, z0, xRhaut, rdc_y, z0,
+        ]);
+        sousGeo.setAttribute('position', new THREE.BufferAttribute(sv, 3));
+        sousGeo.computeVertexNormals();
+        scene.add(new THREE.Mesh(sousGeo, matEsc));
+
+        // Garde-corps blanc : horizontale sur le palier puis main courante inclinée
+        const zA = escZstart;
+        const zB = escZstart - nbMarches * giron;
+        const yA = rdc_y + 0.9;
+        const yB = ss_y + 0.9;
+
+        [
+          [xLhaut - 0.02, xLbas - 0.02],   // côté gauche
+          [xRhaut + 0.02, xRbas + 0.02],   // côté droit
+        ].forEach(([gcXhaut, gcXbas]) => {
+          const hHaut = rdc_y - ss_y + 0.9;
+          [zA, zPalier].forEach(zP => {
+            const p = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, hHaut, 6), matGarde);
+            p.position.set(gcXhaut, ss_y + hHaut / 2, zP);
+            scene.add(p);
+          });
+          const pBas = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), matGarde);
+          pBas.position.set(gcXbas, ss_y + 0.45, zB);
+          scene.add(pBas);
+          // Main courante horizontale au-dessus du palier
+          const railHautGeo = new THREE.BufferGeometry();
+          railHautGeo.setAttribute('position', new THREE.BufferAttribute(
+            new Float32Array([gcXhaut, yA, zA, gcXhaut, yA, zPalier]), 3));
+          scene.add(new THREE.Line(railHautGeo, new THREE.LineBasicMaterial({ color: 0xffffff })));
+          // Main courante inclinée
+          const railGeo = new THREE.BufferGeometry();
+          railGeo.setAttribute('position', new THREE.BufferAttribute(
+            new Float32Array([gcXhaut, yA, zPalier, gcXbas, yB, zB]), 3));
+          scene.add(new THREE.Line(railGeo, new THREE.LineBasicMaterial({ color: 0xffffff })));
+        });
+      }
+
+      // ── Porte de garage (sous-sol) ──
+      // Centrée sous la grande fenêtre → xC = mainX + 1.37 + 0.8
+      // bas de la porte = ss_y (niveau sol), haut = ss_y + 1.9 (dans le soubassement)
+      {
+        const matGarage = new THREE.MeshLambertMaterial({ color: 0xd4b896 });
+        const matGarage2 = new THREE.MeshLambertMaterial({ color: 0xbea07a });
+        const pw = 2.4, ph = 1.9;
+        const xC = mainX + 1.37 + 0.8;
+        const yC = ss_y + ph / 2;
+
+        const g = new THREE.Group();
+        // 2 Panneaux principaux (battants)
+        const bW = pw / 2 - 0.01;
+        const bL = new THREE.Mesh(new THREE.BoxGeometry(bW, ph, 0.05), matGarage);
+        bL.position.set(-pw / 4, 0, 0); g.add(bL);
+        const bR = new THREE.Mesh(new THREE.BoxGeometry(bW, ph, 0.05), matGarage);
+        bR.position.set(pw / 4, 0, 0); g.add(bR);
+
+        // Jointure centrale sombre
+        const joint = new THREE.Mesh(new THREE.BoxGeometry(0.02, ph, 0.055), new THREE.MeshLambertMaterial({ color: 0x5a4a3a }));
+        joint.position.set(0, 0, -0.01); // Épaisseur vers l'extérieur (Z négatif)
+        g.add(joint);
+
+        // Cadre blanc extérieur
+        [[pw + eps * 2, eps, 0.07, 0, ph / 2 + eps / 2],
+        [pw + eps * 2, eps, 0.07, 0, -ph / 2 - eps / 2],
+        [eps, ph, 0.07, -pw / 2 - eps / 2, 0],
+        [eps, ph, 0.07, pw / 2 + eps / 2, 0],
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+          c.position.set(dx, dy, -0.01);
+          g.add(c);
+        });
+
+        // Lames horizontales sur chaque battant
+        const nbLames = 4;
+        const lH = (ph - 0.1) / nbLames;
+        const lameW = bW * 0.85;
+        for (let i = 0; i < nbLames; i++) {
+          const lameY = -ph / 2 + 0.05 + lH * (i + 0.5);
+          const lameL = new THREE.Mesh(new THREE.BoxGeometry(lameW, lH * 0.82, 0.06), matGarage2);
+          lameL.position.set(-pw / 4, lameY, -0.02);
+          g.add(lameL);
+          const lameR = new THREE.Mesh(new THREE.BoxGeometry(lameW, lH * 0.82, 0.06), matGarage2);
+          lameR.position.set(pw / 4, lameY, -0.02);
+          g.add(lameR);
+        }
+
+        // Une seule poignée au milieu (bouton ou levier central)
+        const matPoignee = new THREE.MeshLambertMaterial({ color: 0x222222 });
+        const poignee = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 8), matPoignee);
+        poignee.rotation.z = Math.PI / 2;
+        // Placée au centre, légèrement sur la porte droite, vers l'extérieur (Z = -0.06)
+        poignee.position.set(0.08, 0, -0.06);
+        g.add(poignee);
+
+        const rosace = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.01, 8), matPoignee);
+        rosace.rotation.x = Math.PI / 2;
+        rosace.position.set(0.08, 0, -0.05);
+        g.add(rosace);
+
+        g.position.set(xC, yC, zNord);
+        scene.add(g);
+      }
+    }
+
+    // ─── FAÇADE NORD — RDC + Étage ───────────────────────────────────────────────
+    // Vue depuis le Nord : gauche=Ouest(mainX=-3.35), droite=Est(mainX+mainW=3.35)
+    // zNord = mainZ - 0.02
+    {
+      const zNord = mainZ - 0.02;
+
+      // Fonction fenêtre Nord : allège relative à rdc_y (comme façade Sud)
+      function fenetreNord(fw, fh, allege, xCenter) {
+        const yC = rdc_y + allege + fh / 2;
+        // Vitrage
+        const vit = new THREE.Mesh(new THREE.BoxGeometry(fw, fh, 0.04), matFenetre);
+        vit.position.set(xCenter, yC, zNord);
+        scene.add(vit);
+        // Cadre extérieur
+        [[fw + eps * 2, eps, 0.07, 0, fh / 2 + eps / 2], [fw + eps * 2, eps, 0.07, 0, -fh / 2 - eps / 2],
+        [eps, fh, 0.07, -fw / 2 - eps / 2, 0], [eps, fh, 0.07, fw / 2 + eps / 2, 0]
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+          c.position.set(xCenter + dx, yC + dy, zNord); scene.add(c);
+        });
+        // Cadre intérieur
+        const w2 = fw - eps2, h2 = fh - eps2;
+        const innerFrames = [
+          [w2 + eps2 * 2, eps2, 0.06, 0, h2 / 2 + eps2 / 2],
+          [w2 + eps2 * 2, eps2, 0.06, 0, -h2 / 2 - eps2 / 2],
+          [eps2, h2, 0.06, -w2 / 2 - eps2 / 2, 0],
+          [eps2, h2, 0.06, w2 / 2 + eps2 / 2, 0]
+        ];
+        if (fw >= 1.5) {
+          // 4 vantaux : fixe G (20%) | mobile G (30%) | mobile D (30%) | fixe D (20%)
+          const fix = fw * 0.20;
+          innerFrames.push(
+            [eps2, h2, 0.06, -fw / 2 + fix, 0],  // séparation fixe G / mobile G
+            [eps2, h2, 0.06,  0,             0],  // montant central (entre les 2 mobiles)
+            [eps2, h2, 0.06,  fw / 2 - fix,  0]  // séparation mobile D / fixe D
+          );
+          innerFrames.forEach(([cw, ch, cd, dx, dy]) => {
+            const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre2);
+            c.position.set(xCenter + dx, yC + dy, zNord + 0.015); scene.add(c);
+          });
+          // Poignées des 2 vantaux mobiles (côté montant central, légèrement en saillie)
+          const pgS = 0.03, pgH = 0.18;
+          [-pgS * 2.5, pgS * 1.5].forEach(dx => {
+            const p = new THREE.Mesh(new THREE.BoxGeometry(pgS, pgH, 0.05), matCadre2);
+            p.position.set(xCenter + dx, yC, zNord + 0.05); scene.add(p);
+          });
+        } else {
+          if (fw >= 1) innerFrames.push([eps2, h2, 0.06, 0, 0]);
+          innerFrames.forEach(([cw, ch, cd, dx, dy]) => {
+            const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre2);
+            c.position.set(xCenter + dx, yC + dy, zNord + 0.015); scene.add(c);
+          });
+        }
+      }
+
+      // ── 2 fenêtres 1×2m — 1er étage uniquement ──
+      // F1 : à 1.66m du bord Ouest → centre = mainX + 1.66 + 0.5
+      const xF1 = mainX + 1.66 + 0.5;
+      // F2 : F1 + demi-largeur (0.5) + inter (1.47) + demi-largeur (0.5)
+      const xF2 = xF1 + 0.5 + 1.47 + 0.5;
+      fenetreNord(1, 2, 0.5 + D.mainH_rdc, xF1);
+      fenetreNord(1, 2, 0.5 + D.mainH_rdc, xF2);
+
+      // ── Porte d'entrée style photo : imposte vitrée haut, 2 vitrages verticaux + 2 panneaux bas, poignée gauche ──
+      {
+        const pw = 0.8, ph = 2.5;
+        const xC = mainX + D.mainW - 1.37 - pw / 2;
+        const yBase = rdc_y;  // bas de la porte
+
+        const matBlanc = new THREE.MeshLambertMaterial({ color: 0xffffff });
+        const matVitre = new THREE.MeshLambertMaterial({ color: 0xd8e8f0, transparent: true, opacity: 0.65 });
+        const matPoignee = new THREE.MeshLambertMaterial({ color: 0xcccccc });
+
+        const z = zNord;
+        const d = 0.06;  // épaisseur porte
+
+        // ── Panneau de porte (vitré semi-transparent comme base) ──
+        const fond = new THREE.Mesh(new THREE.BoxGeometry(pw, ph, d), matVitre);
+        fond.position.set(xC, yBase + ph / 2, z);
+        scene.add(fond);
+
+        // ── Cadre extérieur ──
+        [[pw + eps * 2, eps, d + 0.01, 0, ph / 2 + eps / 2],
+        [pw + eps * 2, eps, d + 0.01, 0, -ph / 2 - eps / 2],
+        [eps, ph, d + 0.01, -pw / 2 - eps / 2, 0],
+        [eps, ph, d + 0.01, pw / 2 + eps / 2, 0],
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matBlanc);
+          c.position.set(xC + dx, yBase + ph / 2 + dy, z + 0.005); scene.add(c);
+        });
+
+        // ── Imposte vitrée (haut, 0.35m de hauteur) ──
+        const impH = 0.35, impW = pw - 0.1;
+        const impY = yBase + ph - impH / 2 - 0.05;
+        const imp = new THREE.Mesh(new THREE.BoxGeometry(impW, impH, 0.03), matVitre);
+        imp.position.set(xC, impY, z + 0.02);
+        scene.add(imp);
+        // cadre imposte
+        [[impW + eps * 2, eps, 0.04, 0, impH / 2 + eps / 2], [impW + eps * 2, eps, 0.04, 0, -impH / 2 - eps / 2],
+        [eps, impH, 0.04, -impW / 2 - eps / 2, 0], [eps, impH, 0.04, impW / 2 + eps / 2, 0]
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matBlanc);
+          c.position.set(xC + dx, impY + dy, z + 0.025); scene.add(c);
+        });
+
+        // ── Traverse séparant imposte / corps de porte ──
+        const travY = yBase + ph - impH - 0.05;
+        const trav = new THREE.Mesh(new THREE.BoxGeometry(pw + eps * 2, eps * 1.5, d + 0.01), matBlanc);
+        trav.position.set(xC, travY, z + 0.005);
+        scene.add(trav);
+
+        // ── Zone corps de porte (entre traverse et sol) ──
+        const corpsH = ph - impH - 0.05;  // hauteur restante
+        const corpsYbase = yBase;
+        // Montant central vertical
+        const montX = xC - pw * 0.05; // légèrement décalé vers la gauche (poignée côté gauche)
+        const mont = new THREE.Mesh(new THREE.BoxGeometry(eps * 1.5, corpsH, d + 0.01), matBlanc);
+        mont.position.set(montX, corpsYbase + corpsH / 2, z + 0.005);
+        scene.add(mont);
+        // Traverse horizontale médiane (sépare vitrages hauts / panneaux bas)
+        const midY = corpsYbase + corpsH * 0.52;
+        const midTrav = new THREE.Mesh(new THREE.BoxGeometry(pw + eps * 2, eps * 1.5, d + 0.01), matBlanc);
+        midTrav.position.set(xC, midY, z + 0.005);
+        scene.add(midTrav);
+
+        // ── 2 vitrages verticaux (moitié haute du corps) ──
+        const vW = pw / 2 - 0.1, vH = corpsH * 0.42;
+        const vY = midY + vH / 2 + eps;
+        [-1, 1].forEach(side => {
+          const vit = new THREE.Mesh(new THREE.BoxGeometry(vW, vH, 0.03), matVitre);
+          vit.position.set(xC + side * (pw / 4 + 0.02), vY, z + 0.02);
+          scene.add(vit);
+          [[vW + eps * 2, eps, 0.04, 0, vH / 2 + eps / 2], [vW + eps * 2, eps, 0.04, 0, -vH / 2 - eps / 2],
+          [eps, vH, 0.04, -vW / 2 - eps / 2, 0], [eps, vH, 0.04, vW / 2 + eps / 2, 0]
+          ].forEach(([cw, ch, cd, dx, dy]) => {
+            const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matBlanc);
+            c.position.set(xC + side * (pw / 4 + 0.02) + dx, vY + dy, z + 0.025); scene.add(c);
+          });
+        });
+
+        // ── 2 panneaux moulés bas (juste le cadre en relief, fond transparent) ──
+        const pW = pw / 2 - 0.14, pHp = corpsH * 0.40;
+        const pY = corpsYbase + pHp / 2 + 0.04;
+        const matPanCadre = new THREE.MeshLambertMaterial({ color: 0xf0f0f0 });
+        [-1, 1].forEach(side => {
+          // Uniquement les 4 barres de cadre (pas de fond plein)
+          [[pW + eps * 2, eps * 1.2, 0.025, 0, pHp / 2 + eps / 2],
+          [pW + eps * 2, eps * 1.2, 0.025, 0, -pHp / 2 - eps / 2],
+          [eps * 1.2, pHp, 0.025, -pW / 2 - eps / 2, 0],
+          [eps * 1.2, pHp, 0.025, pW / 2 + eps / 2, 0],
+          ].forEach(([cw, ch, cd, dx, dy]) => {
+            const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matPanCadre);
+            c.position.set(xC + side * (pw / 4 + 0.02) + dx, pY + dy, z + 0.04); scene.add(c);
+          });
+        });
+
+        // ── Poignée côté gauche (X-) ──
+        const poigneeX = xC - pw / 2 + 0.12;
+        const poigneeY = yBase + corpsH * 0.45;
+        const poignee = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.12, 8), matPoignee);
+        poignee.rotation.z = Math.PI / 2;
+        poignee.position.set(poigneeX, poigneeY, z + d / 2 + 0.03);
+        scene.add(poignee);
+        // Rosace
+        const rosace = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.02, 8), matPoignee);
+        rosace.rotation.x = Math.PI / 2;
+        rosace.position.set(poigneeX, poigneeY, z + d / 2 + 0.02);
+        scene.add(rosace);
+      }
+
+      // ── Fenêtre large RDC 1.6×2m ──
+      // À 1.37m du bord Ouest → centre = mainX + 1.37 + 0.8
+      const xFLarge = mainX + 1.37 + 0.8;
+      fenetreNord(1.6, 2, 0.5, xFLarge);
+    }
+
+    // ─── SOUS-SOL (soubassement visible, 2m hors sol) ────────────────────────────
+    const ssSol = box(D.mainW, 2.0, D.mainD, matSousSol, mainX, ss_y, mainZ);
+    scene.add(ssSol);
+
+    // ─── CORPS PRINCIPAL (RDC + étage = un seul bloc coloré) ────────────────────
+    const hauteurHorsSol = D.mainH_rdc + D.mainH_et1;
+    const corpsPrincipal = box(D.mainW, hauteurHorsSol, D.mainD, matMain, mainX, rdc_y, mainZ);
+    scene.add(corpsPrincipal);
+
+    // Moulures d'angle du corps principal (du sol jusqu'au toit)
+    addCornerMoulding(mainX, mainZ, toit_y, ss_y, 'NW');
+    addCornerMoulding(mainX + D.mainW, mainZ, toit_y, ss_y, 'NE');
+    addCornerMoulding(mainX, mainZ + D.mainD, toit_y, ss_y, 'SW');
+    addCornerMoulding(mainX + D.mainW, mainZ + D.mainD, toit_y, ss_y, 'SE'); // visible quand l'aile est cachée
+
+    // ─── AILE (arrière-droite, RDC seulement) ────────────────────────────────────
+    const aileX = mainX + D.mainW - D.aileW;
+    const aileZ = mainZ + D.mainD;
+
+    const aileGroup = new THREE.Group();
+
+    aileGroup.add(box(D.aileW, D.aileH, D.aileD, matAile, aileX, rdc_y, aileZ));
+    aileGroup.add(box(D.aileW, 2.0, D.aileD, matSousSol, aileX, ss_y, aileZ));
+
+    // Façade arrière aile
+    {
+      const zAile = aileZ + D.aileD + 0.02;
+      fenetre(1.6, 1.1, 0.9, aileX + D.aileW / 2, zAile, zAile, aileGroup);
+    }
+
+    // Porte mur Ouest de l'aile
+    {
+      const porteW = 0.9, porteH = 2.2;
+      const porteEps = 0.07;
+      const xPorte = aileX - 0.03;
+      const zPorte = mainZ + D.mainD + 0.1 + porteW / 2;
+
+      const vitPorte = new THREE.Mesh(new THREE.BoxGeometry(0.05, porteH, porteW), matFenetre);
+      vitPorte.position.set(xPorte, rdc_y + porteH / 2, zPorte);
+      aileGroup.add(vitPorte);
+      [
+        [0.05, porteEps, porteW + porteEps * 2, 0, porteH / 2 + porteEps / 2, 0],
+        [0.05, porteH, porteEps, 0, 0, -porteW / 2 - porteEps / 2],
+        [0.05, porteH, porteEps, 0, 0, porteW / 2 + porteEps / 2],
+      ].forEach(([cd, ch, cw, dx, dy, dz]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cd, ch, cw), matCadre);
+        c.position.set(xPorte + dx, rdc_y + porteH / 2 + dy, zPorte + dz);
+        aileGroup.add(c);
+      });
+    }
+
+    // Petite porte beige (1,60 m) sur la façade Ouest de l'aile,
+    // juste à côté de la porte vitrée du raccord
+    {
+      const matPorteBeige = new THREE.MeshLambertMaterial({ color: 0xd4b896 });
+      const matPorteBeige2 = new THREE.MeshLambertMaterial({ color: 0xc8a882 });
+      const porteW = 0.7, porteH = 1.6, porteEps = 0.07;
+      const xPorte = aileX - 0.03;
+      const zPorte = aileZ + D.aileD - 0.2 - porteW / 2;  // ~5,50 m
+      const yBase = ss_y;
+
+      // Panneau beige + panneau central plus foncé
+      const pan = new THREE.Mesh(new THREE.BoxGeometry(0.05, porteH, porteW), matPorteBeige);
+      pan.position.set(xPorte, yBase + porteH / 2, zPorte);
+      aileGroup.add(pan);
+      const pan2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, porteH * 0.8, porteW * 0.7), matPorteBeige2);
+      pan2.position.set(xPorte - 0.01, yBase + porteH / 2, zPorte);
+      aileGroup.add(pan2);
+
+      // Cadre blanc
+      [
+        [0.05, porteEps, porteW + porteEps * 2, 0, porteH / 2 + porteEps / 2, 0],
+        [0.05, porteH, porteEps, 0, 0, -porteW / 2 - porteEps / 2],
+        [0.05, porteH, porteEps, 0, 0, porteW / 2 + porteEps / 2],
+      ].forEach(([cd, ch, cw, dx, dy, dz]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cd, ch, cw), matCadre);
+        c.position.set(xPorte + dx, yBase + porteH / 2 + dy, zPorte + dz);
+        aileGroup.add(c);
+      });
+
+      // Poignée
+      const poignee = new THREE.Mesh(new THREE.CylinderGeometry(0.025, 0.025, 0.10, 8),
+        new THREE.MeshLambertMaterial({ color: 0x222222 }));
+      poignee.rotation.z = Math.PI / 2;
+      poignee.position.set(xPorte - 0.05, yBase + porteH * 0.45, zPorte + porteW * 0.3);
+      aileGroup.add(poignee);
+    }
+
+    // ─── ESCALIER (Est→Ouest, accolé au corps principal côté Sud) ────────────────
+    (function () {
+      const nbMarches = Math.round(rdc_y / 0.18);
+      const hauteurMarche = rdc_y / nbMarches;
+      const giron = 0.28;
+      const largeur = 1.2;
+      const depasse = 0.20;
+      const palier = 0.80;
+
+      const matEsc = new THREE.MeshLambertMaterial({ color: 0xf0f0f0 });
+      const matGarde = new THREE.MeshLambertMaterial({ color: 0x111111 });
+
+      const escZ = mainZ + D.mainD;
+      const escXstart = aileX;
+
+      const longueurTotale = nbMarches * giron + depasse;
+      const nbMarchesBasses = nbMarches - 1;
+      const gironBas = (nbMarches * giron - palier) / nbMarchesBasses;
+      const xPalier = escXstart - palier;
+      const yPrismPalier = rdc_y * (1 - palier / longueurTotale);
+
+      // Palier haut de 80 cm (plateau)
+      aileGroup.add(box(palier, rdc_y - yPrismPalier, largeur, matEsc, xPalier, yPrismPalier, escZ));
+
+      // Marches basses (longueur totale conservée)
+      for (let j = 0; j < nbMarchesBasses; j++) {
+        const yTop = rdc_y - (j + 1) * hauteurMarche;
+        const xRight = xPalier - j * gironBas;
+        aileGroup.add(box(gironBas, hauteurMarche, largeur, matEsc,
+          xRight - gironBas, yTop - hauteurMarche, escZ));
+      }
+      const x0 = escXstart;
+      const x1 = escXstart - longueurTotale;
+      const zL = escZ;
+      const zR = escZ + largeur;
+      const sousGeo = new THREE.BufferGeometry();
+      const v = new Float32Array([
+        x0, ss_y, zL, x1, ss_y, zL, x0, rdc_y, zL,
+        x0, ss_y, zR, x0, rdc_y, zR, x1, ss_y, zR,
+        x0, ss_y, zL, x0, ss_y, zR, x1, ss_y, zL,
+        x1, ss_y, zL, x0, ss_y, zR, x1, ss_y, zR,
+        x0, rdc_y, zL, x0, rdc_y, zR, x1, ss_y, zL,
+        x1, ss_y, zL, x0, rdc_y, zR, x1, ss_y, zR,
+        x0, ss_y, zL, x0, rdc_y, zL, x0, ss_y, zR,
+        x0, ss_y, zR, x0, rdc_y, zL, x0, rdc_y, zR,
+        x1, ss_y, zL, x1, ss_y, zR, x1, ss_y, zL,
+      ]);
+      sousGeo.setAttribute('position', new THREE.BufferAttribute(v, 3));
+      sousGeo.computeVertexNormals();
+      aileGroup.add(new THREE.Mesh(sousGeo, matEsc));
+
+      const xB = escXstart - nbMarches * giron;
+      const yA = rdc_y + 0.9;
+      const yB = ss_y + 0.9;
+
+      function makeGC(gcZ) {
+        const hHaut = rdc_y - ss_y + 0.9;
+        // Un seul poteau haut, au départ de la rampe (l'ancien poteau contre le mur est supprimé)
+        const pPalier = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, hHaut, 6), matGarde);
+        pPalier.position.set(xPalier, ss_y + hHaut / 2, gcZ);
+        aileGroup.add(pPalier);
+
+        const hBas = 0.9;
+        const pBas = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, hBas, 6), matGarde);
+        pBas.position.set(xB, ss_y + hBas / 2, gcZ);
+        aileGroup.add(pBas);
+
+        // Main courante inclinée (le palier est ouvert côté escalier d'accès)
+        const railGeo = new THREE.BufferGeometry();
+        railGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([xPalier, yA, gcZ, xB, yB, gcZ]), 3));
+        aileGroup.add(new THREE.Line(railGeo, new THREE.LineBasicMaterial({ color: 0x111111 })));
+      }
+
+      makeGC(escZ + largeur + 0.02);
+    })();
+
+    scene.add(aileGroup);
+
+    // ─── TOIT CORPS PRINCIPAL (2 pans, faîte parallèle à Z) ─────────────────────
+    function makeToit2Pans(W, D_dim, baseY, startX, startZ, mat) {
+      const halfW = W / 2;
+      const ridge = D.toitPente * halfW;   // hauteur du faîte
+      const overhang = 0.5;                // débord de toit
+
+      // Versant gauche (X négatif → haut)
+      const geo1 = new THREE.BufferGeometry();
+      const v1 = new Float32Array([
+        // 2 triangles = 1 rectangle incliné
+        startX - overhang, baseY, startZ - overhang,
+        startX + halfW, baseY + ridge, startZ - overhang,
+        startX - overhang, baseY, startZ + D_dim + overhang,
+
+        startX - overhang, baseY, startZ + D_dim + overhang,
+        startX + halfW, baseY + ridge, startZ - overhang,
+        startX + halfW, baseY + ridge, startZ + D_dim + overhang,
+      ]);
+      geo1.setAttribute('position', new THREE.BufferAttribute(v1, 3));
+      geo1.computeVertexNormals();
+      const pan1 = new THREE.Mesh(geo1, mat);
+      pan1.castShadow = true;
+
+      // Versant droit
+      const geo2 = new THREE.BufferGeometry();
+      const v2 = new Float32Array([
+        startX + W + overhang, baseY, startZ - overhang,
+        startX + halfW, baseY + ridge, startZ - overhang,
+        startX + W + overhang, baseY, startZ + D_dim + overhang,
+
+        startX + W + overhang, baseY, startZ + D_dim + overhang,
+        startX + halfW, baseY + ridge, startZ - overhang,
+        startX + halfW, baseY + ridge, startZ + D_dim + overhang,
+      ]);
+      geo2.setAttribute('position', new THREE.BufferAttribute(v2, 3));
+      geo2.computeVertexNormals();
+      const pan2 = new THREE.Mesh(geo2, mat);
+      pan2.castShadow = true;
+
+      // Pignon avant et arrière
+      const geo3 = new THREE.BufferGeometry();
+      const v3 = new Float32Array([
+        startX - overhang, baseY, startZ - overhang,
+        startX + W + overhang, baseY, startZ - overhang,
+        startX + halfW, baseY + ridge, startZ - overhang,
+      ]);
+      geo3.setAttribute('position', new THREE.BufferAttribute(v3, 3));
+      geo3.computeVertexNormals();
+      const pignon1 = new THREE.Mesh(geo3, mat);
+
+      const geo4 = new THREE.BufferGeometry();
+      const v4 = new Float32Array([
+        startX - overhang, baseY, startZ + D_dim + overhang,
+        startX + W + overhang, baseY, startZ + D_dim + overhang,
+        startX + halfW, baseY + ridge, startZ + D_dim + overhang,
+      ]);
+      geo4.setAttribute('position', new THREE.BufferAttribute(v4, 3));
+      geo4.computeVertexNormals();
+      const pignon2 = new THREE.Mesh(geo4, mat);
+
+      const group = new THREE.Group();
+      group.add(pan1, pan2, pignon1, pignon2);
+      return group;
+    }
+
+    const toitPrincipal = makeToit2Pans(D.mainW, D.mainD, toit_y, mainX, mainZ, matToit);
+    scene.add(toitPrincipal);
+
+    // Toit aile : versant simple (appentis) qui part du mur arrière du corps principal
+    // et descend vers l'extérieur (Z+). Haut côté corps = toit_y, bas côté ext = rdc_y + aileH
+    (function () {
+      const hBas = rdc_y + D.aileH;          // bord extérieur = sommet du mur de l'aile (2.7m)
+      const hHaut = hBas + D.aileD * 0.25;   // pente 25% : +0.625m sur 2.5m de profondeur (~3.3m)
+      const xL = aileX;                        // aligné sur le mur gauche de l'aile
+      const xR = aileX + D.aileW;             // aligné sur le mur droit de l'aile
+      const zHaut = aileZ;                     // jonction avec le corps principal
+      const zBas = aileZ + D.aileD + 0.3;   // débord 30cm uniquement côté extérieur
+
+      const geo = new THREE.BufferGeometry();
+      const verts = new Float32Array([
+        // versant (2 triangles)
+        xL, hHaut, zHaut,
+        xR, hHaut, zHaut,
+        xL, hBas, zBas,
+
+        xR, hHaut, zHaut,
+        xR, hBas, zBas,
+        xL, hBas, zBas,
+      ]);
+      geo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+      geo.computeVertexNormals();
+      const toitAile = new THREE.Mesh(geo, matToit);
+      aileGroup.add(toitAile);
+
+      function pignon(x) {
+        const g = new THREE.BufferGeometry();
+        const v = new Float32Array([
+          x, hBas, zBas,
+          x, hHaut, zHaut,
+          x, hBas, zHaut,
+        ]);
+        g.setAttribute('position', new THREE.BufferAttribute(v, 3));
+        g.computeVertexNormals();
+        return new THREE.Mesh(g, matToit);
+      }
+      aileGroup.add(pignon(xL));
+      aileGroup.add(pignon(xR));
+    })();
+
+    // ─── EXTENSIONS ──────────────────────────────────────────────────────────────
+    const extensions = {};
+
+    // Helper partagé : porte pleine blanche + petite fenêtre sur façade Sud sous-sol
+    // xLeft = coin Ouest de l'aile, zSud = z façade Sud + offset
+    const matSS_blanc = new THREE.MeshLambertMaterial({ color: 0xffffff });
+    function ajouteFacadeSudSS(grp, xLeft, zSud) {
+      const ep = 0.05, mc = 0.06; // épaisseur facade, largeur montants/cadre
+
+      // Porte pleine blanche : 0.75 × 1.8 m
+      const pW = 0.75, pH = 1.8, pX = xLeft + 0.3, pZ = zSud;
+      grp.add(box(pW, pH, ep, matSS_blanc, pX, ss_y, pZ));
+      grp.add(box(mc, pH + mc, ep, matCadre, pX - mc, ss_y, pZ));       // montant G
+      grp.add(box(mc, pH + mc, ep, matCadre, pX + pW, ss_y, pZ));       // montant D
+      grp.add(box(pW + mc * 2, mc, ep, matCadre, pX - mc, ss_y + pH, pZ)); // traverse haut
+      // Poignée : rosace + barre verticale côté droit de la porte
+      const pgX = pX + pW - 0.12, pgY = ss_y + pH * 0.5, pgS = 0.04, pgH = 0.25;
+      grp.add(box(pgS, pgS, ep + pgS, matSS_blanc, pgX, pgY,           pZ)); // rosace haut
+      grp.add(box(pgS, pgS, ep + pgS, matSS_blanc, pgX, pgY - pgH,     pZ)); // rosace bas
+      grp.add(box(pgS, pgH, ep + pgS, matSS_blanc, pgX, pgY - pgH,     pZ)); // barre verticale
+
+      // Fenêtre 2 vantaux : 1.0 × 0.9 m, côté Est, allège 0.55 m
+      const fW = 1.0, fH = 0.9, fX = pX + 1.1, fY = ss_y + 0.55, fZ = pZ;
+      const fHalf = fW / 2;
+      // Vantail gauche
+      grp.add(box(fHalf, fH, ep, matFenetre, fX, fY, fZ));
+      // Vantail droit
+      grp.add(box(fHalf, fH, ep, matFenetre, fX + fHalf, fY, fZ));
+      // Cadre périmétrique
+      grp.add(box(fW + mc * 2, mc, ep, matCadre, fX - mc, fY - mc, fZ));      // bas
+      grp.add(box(fW + mc * 2, mc, ep, matCadre, fX - mc, fY + fH,  fZ));     // haut
+      grp.add(box(mc, fH + mc * 2, ep, matCadre, fX - mc,      fY - mc, fZ)); // G
+      grp.add(box(mc, fH + mc * 2, ep, matCadre, fX + fW,      fY - mc, fZ)); // D
+      // Montant central (séparation vantaux)
+      grp.add(box(mc, fH, ep, matCadre, fX + fHalf - mc / 2, fY, fZ));
+    }
+
+    // ─── HELPERS PARTAGÉS EXTENSIONS ─────────────────────────────────────────────
+
+    // Toit terrasse plat + 3 corniches (Sud, Est, Ouest)
+    function addFlatRoof(group, w, d, x, z, topY) {
+      const epA = 0.15, hA = 0.30, epM = 0.02, epT = 0.15;
+      const tPlat = new THREE.Mesh(new THREE.BoxGeometry(w - 2*epA, epT, d - epA), matGP);
+      tPlat.position.set(x + w/2, topY + epT/2, z + (d - epA)/2);
+      group.add(tPlat);
+      group.add(box(w + 2*epM, hA, epA + epM, matMoulure, x - epM,     topY, z + d - epA)); // Sud
+      group.add(box(epA + epM, hA, d - epA,   matMoulure, x + w - epA, topY, z));           // Est
+      group.add(box(epA + epM, hA, d - epA,   matMoulure, x - epM,     topY, z));           // Ouest
+    }
+
+    // Porte vitrée sur façade Ouest de l'aile (vitrage + cadre haut + 2 montants)
+    function addWestDoor(group, xP, zP, yBase) {
+      const porteW = 0.9, porteH = 2.2, porteEps = 0.07;
+      const vit = new THREE.Mesh(new THREE.BoxGeometry(0.05, porteH, porteW), matFenetre);
+      vit.position.set(xP, yBase + porteH/2, zP);
+      group.add(vit);
+      [
+        [0.05, porteEps, porteW + porteEps*2, 0,  porteH/2 + porteEps/2, 0],
+        [0.05, porteH,   porteEps,            0,  0, -porteW/2 - porteEps/2],
+        [0.05, porteH,   porteEps,            0,  0,  porteW/2 + porteEps/2],
+      ].forEach(([cd, ch, cw, dx, dy, dz]) => {
+        const c = new THREE.Mesh(new THREE.BoxGeometry(cd, ch, cw), matCadre);
+        c.position.set(xP + dx, yBase + porteH/2 + dy, zP + dz);
+        group.add(c);
+      });
+    }
+
+    // Garde-corps aéré — rail + montants, axe Z (longueur en Z)
+    function addRailZ(group, xPos, zFrom, len, yBase) {
+      const gcS = 0.05, gcH = 1.0, balSp = 0.45;
+      group.add(box(gcS, gcS, len, matGC, xPos, yBase + gcH - gcS, zFrom));
+      const n = Math.ceil(len / balSp);
+      for (let i = 0; i <= n; i++) group.add(box(gcS, gcH, gcS, matGC, xPos, yBase, zFrom + len*i/n));
+    }
+
+    // Garde-corps aéré — rail + montants, axe X (longueur en X)
+    function addRailX(group, xFrom, zPos, len, yBase) {
+      const gcS = 0.05, gcH = 1.0, balSp = 0.45;
+      group.add(box(len, gcS, gcS, matGC, xFrom, yBase + gcH - gcS, zPos));
+      const n = Math.ceil(len / balSp);
+      for (let i = 0; i <= n; i++) group.add(box(gcS, gcH, gcS, matGC, xFrom + len*i/n, yBase, zPos));
+    }
+
+    // Escalier terrasse avec palier (descente vers l'Ouest) + dessous plein triangulaire
+    // xStart = coin Est de l'escalier (=bord Ouest de l'aile), zStart = bord Sud de la terrasse
+    // Retourne { nbM, giron, larg, palierW } pour les garde-corps
+    function addStairWithLanding(group, xStart, zStart) {
+      const nbM = Math.round(rdc_y / 0.18);
+      const hM = rdc_y / nbM;
+      const giron = 0.28, larg = 1.2, palierW = 1.0, dep = 0.20;
+      group.add(box(palierW, rdc_y, larg, matEsc, xStart - palierW, ss_y, zStart));
+      for (let i = 0; i < nbM; i++)
+        group.add(box(giron, hM, larg, matEsc, xStart - palierW - (i+1)*giron, rdc_y - (i+1)*hM, zStart));
+      const x0 = xStart - palierW, x1 = x0 - (nbM*giron + dep);
+      const zL = zStart, zR = zStart + larg;
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([
+        x0, ss_y, zL, x1, ss_y, zL, x0, rdc_y, zL,
+        x0, ss_y, zR, x0, rdc_y, zR, x1, ss_y, zR,
+        x0, ss_y, zL, x0, ss_y, zR, x1, ss_y, zL,
+        x1, ss_y, zL, x0, ss_y, zR, x1, ss_y, zR,
+        x0, rdc_y, zL, x0, rdc_y, zR, x1, ss_y, zL,
+        x1, ss_y, zL, x0, rdc_y, zR, x1, ss_y, zR,
+        x0, ss_y, zL, x0, rdc_y, zL, x0, ss_y, zR,
+        x0, ss_y, zR, x0, rdc_y, zL, x0, rdc_y, zR,
+      ]), 3));
+      geo.computeVertexNormals();
+      group.add(new THREE.Mesh(geo, matEsc));
+      return { nbM, giron, larg, palierW };
+    }
+
+    // Garde-corps penché le long d'un escalier (montants + main courante inclinée)
+    // xTop = sommet de l'escalier (bord Est), zLane = Z du côté extérieur de la voie
+    function addStairRailing(group, xTop, zLane, nbM, giron, palierW) {
+      const gcS = 0.05, gcH = 1.0;
+      const gcZ = zLane + 0.02;
+      const xBot = xTop - palierW - nbM*giron;
+      const yTop = rdc_y + gcH, yBot = gcH;
+      const nPost = Math.round(Math.abs(xBot - xTop) / giron) + 1;
+      for (let i = 0; i < nPost; i++) {
+        const t = i / (nPost - 1);
+        const px = xTop + t*(xBot - xTop);
+        const yr = yTop + t*(yBot - yTop);
+        group.add(box(gcS, yr - ss_y, gcS, matGC, px - gcS/2, ss_y, gcZ - gcS/2));
+      }
+      const rg = new THREE.BufferGeometry().setAttribute('position',
+        new THREE.BufferAttribute(new Float32Array([xTop, yTop, gcZ, xBot, yBot, gcZ]), 3));
+      group.add(new THREE.Line(rg, new THREE.LineBasicMaterial({ color: 0x111111 })));
+    }
+
+    // Fenêtres façade Sud de l'aile (RDC + 1er étage)
+    function addSouthWindows(group, xCenter, zSud) {
+      fenetre(1.6, 1.1, 0.9,         xCenter, zSud, zSud, group);
+      fenetre(1,   2,   D.aileH+0.5, xCenter, zSud, zSud, group);
+    }
+
+
+    // ─── PROJET D'AGRANDISSEMENT (unique) ───────────────────────────────────────
+    // Extension en L derrière l'aile arrière-droite :
+    //   - 1er rectangle  : 3,9 × 1,1 m, aligné sur la cuisine/l'aile
+    //   - grand rectangle : 6,69 × 3,84 m, largeur de la maison
+    //   dessus du volume = plancher RDC + 0,60 m (2,60 m)
+    //   volume maçonné + bordure verte + terrasse grise + garde-fou à barres
+    (function () {
+      const hautProjet = rdc_y + 0.60;         // 2,60 m
+      const epDalProjet = 0.15;
+      const hVolProjet = hautProjet - epDalProjet; // 2,45 m
+      const zAileArriere = aileZ + D.aileD;    // 6,05 m
+
+      // ── Emprises ──
+      const w1 = 3.9, d1 = 1.1;                // premier rectangle (cuisine)
+      const x1 = mainX + D.mainW - w1;         // aligné à droite
+      const z1 = zAileArriere;
+      const w2 = D.mainW, d2 = 3.84;           // grand rectangle (largeur maison)
+      const x2 = mainX;
+      const z2 = z1 + d1;
+
+      const group = new THREE.Group();
+
+      // ── Volumes maçonnés ──
+      group.add(box(w1, hVolProjet, d1, matSousSol, x1, ss_y, z1));
+      group.add(box(w2, hVolProjet, d2, matSousSol, x2, ss_y, z2));
+
+      // ── Bordure (fascia) verte : même vert que la maison ──
+      [[w1, d1, x1, z1], [w2, d2, x2, z2]].forEach(([w, d, x, z]) => {
+        const bordure = new THREE.Mesh(new THREE.BoxGeometry(w, epDalProjet, d), matMain);
+        bordure.position.set(x + w / 2, hautProjet - epDalProjet / 2, z + d / 2);
+        bordure.castShadow = true;
+        bordure.receiveShadow = true;
+        group.add(bordure);
+      });
+
+      // ── Dessus de terrasse en gris clair ──
+      const matTerrasse = new THREE.MeshLambertMaterial({ color: 0xcfcfcf });
+      [[w1, d1, x1, z1], [w2, d2, x2, z2]].forEach(([w, d, x, z]) => {
+        const top = new THREE.Mesh(new THREE.BoxGeometry(w, 0.02, d), matTerrasse);
+        top.position.set(x + w / 2, hautProjet + 0.01, z + d / 2);
+        top.receiveShadow = true;
+        group.add(top);
+      });
+
+      // ── Garde-fou à barres verticales (périmètre exposé) ──
+      // (le côté Nord du raccord est contre le mur de l'aile)
+      // Hauteur 1,00 m, une barre sur deux : entraxe 22 cm (rendu plus aéré).
+      // Note : ce n'est plus conforme à la règle de la sphère de 10 cm.
+      const yTerr = hautProjet + 0.02;          // 2,62 m
+      const hRail = 1.0;
+      const railSec = 0.05, barSec = 0.03;
+      const barSpacing = 0.22;
+      const terrasseGroup = new THREE.Group();
+      const stairX0 = aileX - 0.80;             // bord Ouest de l'escalier d'accès
+
+      function railX(xFrom, xTo, zEdge) {
+        const len = xTo - xFrom;
+        terrasseGroup.add(box(len, railSec, railSec, matGC, xFrom, yTerr + hRail - railSec, zEdge - railSec / 2));
+        const n = Math.max(1, Math.round(len / barSpacing));
+        for (let i = 0; i <= n; i++) {
+          const x = xFrom + (len * i) / n;
+          terrasseGroup.add(box(barSec, hRail - railSec, barSec, matGC, x - barSec / 2, yTerr, zEdge - barSec / 2));
+        }
+      }
+
+      function railZ(zFrom, zTo, xEdge) {
+        const len = zTo - zFrom;
+        terrasseGroup.add(box(railSec, railSec, len, matGC, xEdge - railSec / 2, yTerr + hRail - railSec, zFrom));
+        const n = Math.max(1, Math.round(len / barSpacing));
+        for (let i = 0; i <= n; i++) {
+          const z = zFrom + (len * i) / n;
+          terrasseGroup.add(box(barSec, hRail - railSec, barSec, matGC, xEdge - barSec / 2, yTerr, z - barSec / 2));
+        }
+      }
+
+      railZ(z1, z2, x1);                       // Ouest du raccord
+      railX(x2, stairX0, z2);                  // Déboitement (ouverture de l'escalier d'accès)
+      railX(x2, x2 + w2, z2 + d2);             // Sud (vue jardin)
+
+      // ── Escalier d'accès : palier de l'escalier de l'aile → terrasse ──
+      // De z = 4,75 (palier aile, 2,00 m) à z = 7,15 (terrasse, 2,60 m)
+      const zStair0 = aileZ + 1.2;             // 4,75 m
+      const zStair1 = z2;                      // 7,15 m
+      const nStair = 4;
+      const going = (zStair1 - zStair0) / nStair;   // 0,60 m
+      const rise = (hautProjet - rdc_y) / nStair;   // 0,15 m
+
+      // Marches en structure ouverte (dessous vide : les portes restent visibles)
+      for (let j = 0; j < nStair; j++) {
+        const top = rdc_y + (j + 1) * rise;
+        const zFrom = zStair0 + j * going;
+        // Marche (plateau)
+        terrasseGroup.add(box(0.80, 0.05, going, matEsc, stairX0, top - 0.05, zFrom));
+        // Contremarche
+        terrasseGroup.add(box(0.80, rise, 0.03, matEsc, stairX0, top - rise, zFrom));
+      }
+
+      // Limons latéraux (structure ouverte, pas de remplissage sous l'escalier)
+      const slopeLen = Math.hypot(zStair1 - zStair0, hautProjet - rdc_y);
+      const slopeAng = Math.atan2(hautProjet - rdc_y, zStair1 - zStair0);
+      [stairX0 + 0.03, aileX - 0.03].forEach(xS => {
+        const limon = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.12, slopeLen), matEsc);
+        limon.position.set(xS, (rdc_y + hautProjet) / 2 - 0.06, (zStair0 + zStair1) / 2);
+        limon.rotation.x = -slopeAng;
+        terrasseGroup.add(limon);
+      });
+
+      // Garde-fou sur le côté Ouest de l'escalier
+      const railY0 = rdc_y + 0.9;              // 2,90 m
+      const railY1 = hautProjet + 0.9;         // 3,50 m
+      const railGeoStair = new THREE.BufferGeometry();
+      railGeoStair.setAttribute('position', new THREE.BufferAttribute(
+        new Float32Array([stairX0, railY0, zStair0, stairX0, railY1, zStair1]), 3));
+      terrasseGroup.add(new THREE.Line(railGeoStair, new THREE.LineBasicMaterial({ color: 0x111111 })));
+
+      for (let j = 0; j <= nStair; j++) {
+        const zP = zStair0 + j * going;
+        const stepTop = rdc_y + j * rise;
+        const p = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.9, 6), matGC);
+        p.position.set(stairX0, stepTop + 0.45, zP);
+        terrasseGroup.add(p);
+      }
+
+      // ── Garde-corps vitré surélevé (sécurité + brise-vue) sur les côtés latéraux ──
+      // Verre feuilleté/trempé de 1,70 m ; main courante et profil bas en aluminium noir.
+      const matVerreGC = new THREE.MeshLambertMaterial({
+        color: 0xdfeaef, transparent: true, opacity: 0.70, side: THREE.DoubleSide,
+      });
+      const gcH = 1.70;
+      const gcBase = yTerr;                // 2,62 m
+      const gcTop = gcBase + gcH;          // 4,32 m
+
+      function gardeCorpsVitre(xEdge, zFrom, zTo) {
+        const len = zTo - zFrom;
+        const zMid = (zFrom + zTo) / 2;
+
+        // Vitrage continu
+        const g = new THREE.Mesh(new THREE.BoxGeometry(0.02, gcH, len), matVerreGC);
+        g.position.set(xEdge, gcBase + gcH / 2, zMid);
+        terrasseGroup.add(g);
+
+        // Profil bas
+        const bas = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.05, len), matGC);
+        bas.position.set(xEdge, gcBase + 0.025, zMid);
+        terrasseGroup.add(bas);
+
+        // Main courante
+        const haut = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.06, len), matGC);
+        haut.position.set(xEdge, gcTop - 0.03, zMid);
+        terrasseGroup.add(haut);
+
+        // Poteaux : extrémités + environ tous les 1,5 m
+        const nP = Math.max(1, Math.round(len / 1.5));
+        for (let i = 0; i <= nP; i++) {
+          const zP = zFrom + (len * i) / nP;
+          const p = new THREE.Mesh(new THREE.BoxGeometry(0.06, gcH, 0.06), matGC);
+          p.position.set(xEdge, gcBase + gcH / 2, zP);
+          terrasseGroup.add(p);
+        }
+      }
+
+      gardeCorpsVitre(x1 + w1 - 0.04, z1, z2 + d2);   // Côté Est
+      gardeCorpsVitre(x2 + 0.04, z2, z2 + d2);        // Côté Ouest (grand volume)
+
+      group.add(terrasseGroup);
+
+      // ── Ouvertures de façade ──
+      const matPorte = new THREE.MeshLambertMaterial({ color: 0xc8b89a });
+      const eCadre = 0.07;
+
+      // Fenêtre sur une façade Z (dir : +1 regarde vers +Z, -1 vers -Z)
+      function fenetreZ(w, h, allege, xC, zFace, dir) {
+        const yC = allege + h / 2;
+        const zP = zFace + dir * 0.02;
+        const vit = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.04), matFenetre);
+        vit.position.set(xC, yC, zP);
+        group.add(vit);
+        [
+          [w + eCadre * 2, eCadre, 0.07, 0, h / 2 + eCadre / 2],
+          [w + eCadre * 2, eCadre, 0.07, 0, -h / 2 - eCadre / 2],
+          [eCadre, h, 0.07, -w / 2 - eCadre / 2, 0],
+          [eCadre, h, 0.07, w / 2 + eCadre / 2, 0],
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+          c.position.set(xC + dx, yC + dy, zP + dir * 0.01);
+          group.add(c);
+        });
+        const montant = new THREE.Mesh(new THREE.BoxGeometry(0.04, h - 0.08, 0.06), matCadre2);
+        montant.position.set(xC, yC, zP + dir * 0.025);
+        group.add(montant);
+      }
+
+      // Porte sur une façade Z
+      function porteZ(w, h, xC, zFace, dir, mat = matPorte) {
+        const zP = zFace + dir * 0.03;
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(w, h, 0.06), mat);
+        leaf.position.set(xC, h / 2, zP);
+        group.add(leaf);
+        [
+          [w + eCadre * 2, eCadre, 0.08, 0, h + eCadre / 2],
+          [eCadre, h + eCadre, 0.08, -w / 2 - eCadre / 2, h / 2 + eCadre / 2],
+          [eCadre, h + eCadre, 0.08, w / 2 + eCadre / 2, h / 2 + eCadre / 2],
+        ].forEach(([cw, ch, cd, dx, dy]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cw, ch, cd), matCadre);
+          c.position.set(xC + dx, dy, zP + dir * 0.01);
+          group.add(c);
+        });
+        const poignee = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.04), matGC);
+        poignee.position.set(xC + w / 2 - 0.14, 1.05, zP + dir * 0.05);
+        group.add(poignee);
+      }
+
+      // Porte sur une façade X (dir : +1 regarde vers +X, -1 vers -X)
+      function porteX(w, h, zC, xFace, dir, mat = matPorte) {
+        const xP = xFace + dir * 0.03;
+        const leaf = new THREE.Mesh(new THREE.BoxGeometry(0.06, h, w), mat);
+        leaf.position.set(xP, h / 2, zC);
+        group.add(leaf);
+        [
+          [0.08, eCadre, w + eCadre * 2, h + eCadre / 2, 0],
+          [0.08, h + eCadre, eCadre, h / 2 + eCadre / 2, -w / 2 - eCadre / 2],
+          [0.08, h + eCadre, eCadre, h / 2 + eCadre / 2, w / 2 + eCadre / 2],
+        ].forEach(([cd, ch, cw, dy, dz]) => {
+          const c = new THREE.Mesh(new THREE.BoxGeometry(cd, ch, cw), matCadre);
+          c.position.set(xP + dir * 0.01, dy, zC + dz);
+          group.add(c);
+        });
+        const poignee = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.12, 0.04), matGC);
+        poignee.position.set(xP + dir * 0.05, 1.05, zC + w / 2 - 0.14);
+        group.add(poignee);
+      }
+
+      // Façade arrière du grand rectangle : grande baie vitrée centrée 2,00 × 2,20 m
+      const zFond = z2 + d2;                    // 10,99 m
+      fenetreZ(2.0, 2.2, 0, 0, zFond, +1);
+
+      // Porte vitrée dans le coin de la façade Nord, sous l'escalier d'accès
+      // (l'espace 1,1 × 3,9 m est libéré pour la salle de bain)
+      porteZ(0.8, 2.1, (stairX0 + x1) / 2, z2, -1, matFenetre);
+
+      scene.add(group);
+      extensions['projet'] = { group };
+      extensions['terrasse'] = { group: terrasseGroup };
+    })();
+
+    // ─── AFFICHER / MASQUER L'EXTENSION ─────────────────────────────────────────
+    window.toggleExtension = function (name) {
+      const ext = extensions[name];
+      if (!ext) return;
+      ext.group.visible = !ext.group.visible;
+      const btn = document.getElementById('btn-ext-' + name);
+      if (btn) {
+        btn.classList.toggle('active', ext.group.visible);
+        btn.textContent = ext.group.visible ? "Masquer l'extension" : "Afficher l'extension";
+      }
+      updateDimLabels();
+    };
+
+    // ─── AFFICHER / CACHER LA TERRASSE ──────────────────────────────────────────
+    // Pour l'instant ce groupe ne contient que le garde-fou.
+    window.toggleTerrasse = function () {
+      const t = extensions['terrasse'];
+      if (!t) return;
+      t.group.visible = !t.group.visible;
+      const btn = document.getElementById('btn-terrasse');
+      if (btn) {
+        btn.classList.toggle('active', t.group.visible);
+        btn.textContent = t.group.visible ? 'Cacher la terrasse' : 'Afficher la terrasse';
+      }
+    };
+    toggleTerrasse();   // par défaut : terrasse masquée
+
+    // ─── DIMENSIONS 3D ───────────────────────────────────────────────────────────
+    let dimsVisible = false;
+    const dimGroup = new THREE.Group();
+    scene.add(dimGroup);
+
+    function createDimLabel(text, x, y, z) {
+      const div = document.createElement('div');
+      div.className = 'dim-label';
+      div.textContent = text;
+      const obj = new CSS2DObject(div);
+      obj.position.set(x, y, z);
+      return obj;
+    }
+
+    // Détails de l'extension en L, recalculés depuis la géométrie
+    const _projetW1 = D.aileW, _projetD1 = 1.1;     // raccord = largeur cuisine
+    const _projetX1 = mainX + D.mainW - _projetW1;  // -0,55 m (aligné cuisine/aile)
+    const _projetZ1 = aileZ + D.aileD;              // 6,05 m
+    const _projetW2 = D.mainW, _projetD2 = 3.84;
+    const _projetX2 = mainX;
+    const _projetZ2 = _projetZ1 + _projetD1;
+    const _projetTop = rdc_y + 0.60;                // 2,60 m
+
+    const _projetS1 = _projetW1 * _projetD1;        // 4,29 m²
+    const _projetS2 = _projetW2 * _projetD2;        // 25,69 m²
+    const _projetStotal = _projetS1 + _projetS2;    // 29,98 m²
+    const _projetDeboit = _projetW2 - _projetW1;    // 2,80 m
+
+    const fmtM = n => String(Math.round(n * 100) / 100).replace('.', ',');
+
+    const matDim = new THREE.MeshBasicMaterial({ color: 0xe94560 });
+
+    // Cote horizontale (axe X) : ligne + extrémités + longueur
+    function addDimX(xFrom, xTo, z, text) {
+      const y = _projetTop + 0.06;
+      const midX = (xFrom + xTo) / 2;
+      const line = new THREE.Mesh(new THREE.BoxGeometry(Math.abs(xTo - xFrom), 0.02, 0.02), matDim);
+      line.position.set(midX, y, z);
+      dimGroup.add(line);
+      [xFrom, xTo].forEach(x => {
+        const tick = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, 0.18), matDim);
+        tick.position.set(x, y, z);
+        dimGroup.add(tick);
+      });
+      dimGroup.add(createDimLabel(text, midX, y + 0.12, z));
+    }
+
+    // Cote en plan (axe Z) : ligne + extrémités + longueur
+    function addDimZ(zFrom, zTo, x, text) {
+      const y = _projetTop + 0.06;
+      const midZ = (zFrom + zTo) / 2;
+      const line = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.02, Math.abs(zTo - zFrom)), matDim);
+      line.position.set(x, y, midZ);
+      dimGroup.add(line);
+      [zFrom, zTo].forEach(z => {
+        const tick = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.02, 0.02), matDim);
+        tick.position.set(x, y, z);
+        dimGroup.add(tick);
+      });
+      dimGroup.add(createDimLabel(text, x, y + 0.12, midZ));
+    }
+
+    function updateDimLabels() {
+      dimGroup.clear();
+      if (!dimsVisible) return;
+      if (!extensions['projet']?.group.visible) return;
+
+      const off = 0.25;
+
+      // Largeur du raccord (sur le toit)
+      addDimX(_projetX1, _projetX2 + _projetW2, _projetZ1 + _projetD1 / 2, `${fmtM(_projetW1)} m`);
+      // Profondeur du raccord (côté Ouest)
+      addDimZ(_projetZ1, _projetZ2, _projetX1 - off, `${fmtM(_projetD1)} m`);
+      // Déboitement (avant du grand volume)
+      addDimX(_projetX2, _projetX1, _projetZ2 - off, `${fmtM(_projetDeboit)} m`);
+      // Profondeur du grand volume (côté Ouest)
+      addDimZ(_projetZ2, _projetZ2 + _projetD2, _projetX2 - off, `${fmtM(_projetD2)} m`);
+      // Largeur du grand volume (fond)
+      addDimX(_projetX2, _projetX2 + _projetW2, _projetZ2 + _projetD2 + off, `${fmtM(_projetW2)} m`);
+      // Profondeur totale (côté Est)
+      addDimZ(_projetZ1, _projetZ2 + _projetD2, _projetX1 + _projetW1 + off, `${fmtM(_projetD1 + _projetD2)} m`);
+
+      // Surface totale au milieu de l'extension
+      const cX = _projetX2 + _projetW2 / 2;
+      const cZ = _projetZ2 + _projetD2 / 2;
+      const div = document.createElement('div');
+      div.className = 'dim-label surface';
+      div.textContent = `${fmtM(_projetStotal)} m²`;
+      const obj = new CSS2DObject(div);
+      obj.position.set(cX, _projetTop + 0.35, cZ);
+      dimGroup.add(obj);
+    }
+
+    window.toggleDims = function () {
+      dimsVisible = !dimsVisible;
+      const btn = document.getElementById('btn-dims');
+      btn.textContent = dimsVisible ? 'Cacher les dimensions' : 'Afficher les dimensions';
+      btn.classList.toggle('active', dimsVisible);
+      updateDimLabels();
+    };
+    toggleDims();
+
+    // ─── PLAN EXTÉRIEUR (vue de dessus, cotes extérieures) ─────────────────────
+    function buildExteriorPlan() {
+      const S = 100, OX = 1.0, OZ = 1.0;
+      const px = x => (x + OX) * S;
+      const py = z => (z + OZ) * S;
+      const f2 = n => n.toFixed(2).replace('.', ',');
+
+      const W = D.mainW;        // 6,69
+      const SW = D.aileW;       // 3,90
+      const SD = _projetD1;     // 1,10
+      const BD = _projetD2;     // 3,84
+      const SX = W - SW;        // 2,79
+      const TD = SD + BD;       // 4,94
+      const area = SW * SD + W * BD;
+
+      const P = arr => arr.map(([x, z]) => `${px(x).toFixed(1)},${py(z).toFixed(1)}`).join(' ');
+      const ext = P([[SX, 0], [W, 0], [W, TD], [0, TD], [0, SD], [SX, SD]]);
+
+      const svgW = Math.round(px(W) + 1.4 * S);
+      const svgH = Math.round(py(TD) + 1.3 * S);
+
+      let s = `<svg viewBox="0 0 ${svgW} ${svgH}" xmlns="http://www.w3.org/2000/svg" font-family="Arial, sans-serif">`;
+      s += `<rect x="0" y="0" width="${svgW}" height="${svgH}" fill="#fbfaf6"/>`;
+      s += `<polygon points="${ext}" fill="#f2efe6" stroke="#2b2b2b" stroke-width="2.5"/>`;
+
+      function dimH(x1, x2, zRef, zDim, text) {
+        const y = py(zDim);
+        [x1, x2].forEach(x => {
+          s += `<line x1="${px(x)}" y1="${py(zRef)}" x2="${px(x)}" y2="${y}" stroke="#8a8a8a" stroke-width="1" stroke-dasharray="4 3"/>`;
+        });
+        s += `<line x1="${px(x1)}" y1="${y}" x2="${px(x2)}" y2="${y}" stroke="#e94560" stroke-width="1.5"/>`;
+        [x1, x2].forEach(x => {
+          s += `<line x1="${px(x)}" y1="${y - 7}" x2="${px(x)}" y2="${y + 7}" stroke="#e94560" stroke-width="1.5"/>`;
+        });
+        const cx = (px(x1) + px(x2)) / 2;
+        s += `<rect x="${cx - 33}" y="${y - 10}" width="66" height="20" rx="3" fill="#fff" stroke="#e94560"/>`;
+        s += `<text x="${cx}" y="${y + 4.5}" text-anchor="middle" font-size="13" fill="#111">${text}</text>`;
+      }
+
+      function dimV(z1, z2, xRef, xDim, text) {
+        const x = px(xDim);
+        [z1, z2].forEach(z => {
+          s += `<line x1="${px(xRef)}" y1="${py(z)}" x2="${x}" y2="${py(z)}" stroke="#8a8a8a" stroke-width="1" stroke-dasharray="4 3"/>`;
+        });
+        s += `<line x1="${x}" y1="${py(z1)}" x2="${x}" y2="${py(z2)}" stroke="#e94560" stroke-width="1.5"/>`;
+        [z1, z2].forEach(z => {
+          s += `<line x1="${x - 7}" y1="${py(z)}" x2="${x + 7}" y2="${py(z)}" stroke="#e94560" stroke-width="1.5"/>`;
+        });
+        const cy = (py(z1) + py(z2)) / 2;
+        s += `<rect x="${x - 33}" y="${cy - 10}" width="66" height="20" rx="3" fill="#fff" stroke="#e94560"/>`;
+        s += `<text x="${x}" y="${cy + 4.5}" text-anchor="middle" font-size="13" fill="#111">${text}</text>`;
+      }
+
+      // Cotes extérieures
+      dimH(SX, W, 0, -0.45, `${f2(SW)} m`);           // largeur du raccord
+      dimV(0, SD, SX, SX - 0.30, `${f2(SD)} m`);      // profondeur du raccord
+      dimH(0, W, TD, TD + 0.45, `${f2(W)} m`);        // largeur totale
+      dimV(SD, TD, 0, -0.45, `${f2(BD)} m`);          // profondeur du grand volume
+      dimH(0, SX, SD, SD - 0.25, `${f2(SX)} m`);      // déboitement
+      dimV(0, TD, W, W + 0.45, `${f2(TD)} m`);        // profondeur totale
+
+      const ax = px(W / 2);
+      const ay = py((0 + TD) / 2 + 0.15);
+      s += `<text x="${ax}" y="${ay - 6}" text-anchor="middle" font-size="14" fill="#555">Emprise au sol</text>`;
+      s += `<text x="${ax}" y="${ay + 18}" text-anchor="middle" font-size="19" font-weight="bold" fill="#e94560">${f2(area)} m²</text>`;
+      s += `<text x="${ax}" y="${ay + 40}" text-anchor="middle" font-size="12" fill="#555">Hauteur : 2,60 m</text>`;
+      s += `<text x="${px((SX + W) / 2)}" y="${py(-0.8)}" text-anchor="middle" font-size="12" fill="#555">Aile existante (côté maison)</text>`;
+      s += `<text x="${px(W / 2)}" y="${py(TD + 0.9)}" text-anchor="middle" font-size="12" fill="#555">Jardin</text>`;
+      s += `</svg>`;
+
+      document.getElementById('plan-svg-wrap').innerHTML = s;
+    }
+
+    window.showTab = function (name) {
+      const is3d = name === '3d';
+      document.getElementById('main').style.display = 'flex';
+      labelRenderer.domElement.style.display = is3d ? '' : 'none';
+      document.getElementById('plan-view').classList.toggle('active', !is3d);
+      const btnPlan = document.getElementById('btn-plan');
+      if (btnPlan) {
+        btnPlan.classList.toggle('active', !is3d);
+        btnPlan.textContent = is3d ? 'Afficher le plan' : 'Retour 3D';
+      }
+      document.querySelector('#plan-head h2').textContent = 'Extension en L — vue de dessus (cotes extérieures)';
+      document.querySelector('#plan-head p').textContent = 'Cotes extérieures en mètres · hauteur 2,60 m';
+      document.getElementById('status-bar').textContent = is3d
+        ? 'Cliquez et faites glisser pour tourner autour de la maison.'
+        : 'Vue de dessus — cotes extérieures.';
+      if (is3d) onResize();
+      else buildExteriorPlan();
+    };
+
+    window.togglePlan = function () {
+      const active = document.getElementById('plan-view').classList.contains('active');
+      showTab(active ? '3d' : 'exterieur');
+      document.getElementById('sidebar').classList.remove('open');
+    };
+
+    window.toggleMenu = function () {
+      document.getElementById('sidebar').classList.toggle('open');
+    };
+
+    const urlParams = new URLSearchParams(location.search);
+    const vueParam = urlParams.get('vue');
+    if (vueParam === 'interieur' || urlParams.get('plan') === '1') {
+      location.replace('interieur.html');
+    } else {
+      const modeInitial = (vueParam === 'exterieur' || urlParams.get('exterieur') === '1') ? 'exterieur' : '3d';
+      showTab(modeInitial);
+    }
+
+    // ─── KEYBOARD SHORTCUTS ──────────────────────────────────────────────────────
+    document.addEventListener('keydown', (e) => {
+      switch (e.key.toLowerCase()) {
+        case 'r':
+          camera.position.set(20, 15, 20);
+          controls.target.set(0, 3, 0);
+          controls.update();
+          break;
+        case 't':
+          camera.position.set(0, 30, 0.001);
+          controls.target.set(0, 0, 0);
+          controls.update();
+          break;
+        case 'f':
+          camera.position.set(0, 8, 25);
+          controls.target.set(0, 4, 0);
+          controls.update();
+          break;
+      }
+    });
+
+    // ─── RESIZE ──────────────────────────────────────────────────────────────────
+    function onResize() {
+      const w = canvas.clientWidth;
+      const h = canvas.clientHeight;
+      renderer.setSize(w, h, false);
+      labelRenderer.setSize(w, h);
+      camera.aspect = w / h;
+      camera.updateProjectionMatrix();
+    }
+    new ResizeObserver(onResize).observe(canvas);
+    onResize();
+
+    // ─── LOOP ────────────────────────────────────────────────────────────────────
+    controls.target.set(0, 5, 0);
+    controls.update();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+      labelRenderer.render(scene, camera);
+    }
+    animate();
+  </script>
+</body>
+
+</html>
